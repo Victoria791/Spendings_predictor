@@ -1,64 +1,43 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, render_template, request
 import joblib
 import pandas as pd
-import numpy as np
 
+# Load the trained model
+model = joblib.load('finance.pkl')
 
 app = Flask(__name__)
 
-
-model = joblib.load('finance.pkl')
-
 @app.route('/')
-def home():
+def index():
     return render_template('index.html')
 
 @app.route('/predict', methods=['POST'])
 def predict():
-    try:
-       
-        income = float(request.form['income'])
-        fixed_expenses = float(request.form['fixed_expenses'])
-        discretionary_expenses = float(request.form['discretionary_expenses'])
-        risk_tolerance = request.form['risk_tolerance']
+    # Get user inputs from the form
+    income = float(request.form['income'])
+    fixed_expenses = float(request.form['fixed_expenses'])
+    discretionary_expenses = float(request.form['discretionary_expenses'])
+    risk_tolerance = int(request.form['risk_tolerance'])
 
-       
-        X = pd.DataFrame([[income, fixed_expenses, discretionary_expenses]], 
-                         columns=['Income', 'Fixed Expenses', 'Discretionary Expenses'])
+    # Prepare the features for prediction
+    features = pd.DataFrame([[income, fixed_expenses, discretionary_expenses]],
+                            columns=['Income', 'Fixed Expenses', 'Discretionary Expenses'])
 
-       
-        predicted_savings = model.predict(X)[0]
+    # Predict savings using the model
+    savings_prediction = model.predict(features)[0]
 
-       
-        fixed_expense_ratio = 0.50
-        discretionary_ratio = 0.30
-        savings_ratio = 0.20
+    # Generate investment recommendation based on risk tolerance
+    if risk_tolerance == 1:
+        investment_recommendation = "Low-risk investments: Bonds, Savings Accounts"
+    elif risk_tolerance == 2:
+        investment_recommendation = "Moderate-risk investments: Balanced ETFs, Mutual Funds"
+    else:
+        investment_recommendation = "High-risk investments: Stocks, Real Estate"
 
-        suggested_fixed_expenses = income * fixed_expense_ratio
-        suggested_discretionary_expenses = income * discretionary_ratio
-        suggested_savings = income * savings_ratio
+    # Render the result in an HTML template
+    return render_template('result.html', 
+                           savings=savings_prediction, 
+                           investment_recommendation=investment_recommendation)
 
-       
-        if risk_tolerance == '1':
-            investment_recommendation = "Low-risk investments: Bonds, Savings Accounts"
-        elif risk_tolerance == '2':
-            investment_recommendation = "Moderate-risk investments: Balanced ETFs, Mutual Funds"
-        elif risk_tolerance == '3':
-            investment_recommendation = "High-risk investments: Stocks, Real Estate"
-        else:
-            investment_recommendation = "Invalid risk tolerance value provided."
-
-        
-        return jsonify({
-            'Predicted Savings': f"${predicted_savings:.2f}",
-            'Suggested Fixed Expenses': f"${suggested_fixed_expenses:.2f}",
-            'Suggested Discretionary Expenses': f"${suggested_discretionary_expenses:.2f}",
-            'Suggested Savings': f"${suggested_savings:.2f}",
-            'Investment Recommendation': investment_recommendation
-        })
-
-    except Exception as e:
-        return jsonify({'error': str(e)})
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     app.run(debug=True)
